@@ -1,0 +1,31 @@
+1. Meeting / Content Summary
+This was GitLab's Engineering Key Review on February 18, 2021, led by Eric Johnson. The meeting covered proposals to restructure key review meetings, clarification and refinement of engineering metrics like Merge Request (MR) rates and defect tracking, and an update on a critical PostgreSQL replication lag issue. Key discussions led to decisions to split the main engineering review into department-specific meetings, change the way community contributions are measured, and improve the accuracy of bug SLO achievement metrics by focusing on open bugs. The team also reviewed overall performance indicators, including the Sus score and Nero MR rate, and discussed the context behind recent fluctuations.
+
+2. Key Points
+*   **Key Review Meeting Reorganization:** A proposal to break the engineering key review into four department-specific key reviews (e.g., Development/Quality, Security/UX) on a two-month rotation was approved to allow for deeper discussions and increased visibility.
+*   **Community MR Rate Metric Change:** Due to complexity and potential for misunderstanding, the "R&D wider MR rate" will be replaced by a simpler KPI tracking the "percentage of total MRs that come from the community over time."
+*   **PostgreSQL Replication Lag:** There is a significant lag issue affecting metric updates, with an action plan to create a dedicated host for data pulling and further investigation into database tuning and overall database demand.
+*   **Defect Tracking Refinement:** Progress is being made on tracking defects against SLOs, with S1s at 80% and S2s at 60%. A new metric for "average open bug age" is in development.
+*   **Bug SLO Measurement Improvement:** The current method of measuring bug SLO achievement based on *closed bugs* was deemed misleading. The team will shift to measuring the "percentage of open bugs within SLO" or exceeding SLO.
+*   **Nero MR Rate:** The Nero MR rate was below target but explained by seasonal factors and specific events. The target has been set to 10.0 to stabilize productivity while focusing on quality, security, and availability.
+
+3. Action Items / Tasks
+*   **Lily & Max:** Work together to transition the community contribution metric to "percentage of total MRs that come from the community over time."
+*   **Christopher:** Conduct a deeper investigation into the spike in S2 mean time to close for defects and provide an update at the next meeting.
+*   **Steve & Christopher:** Partner on addressing the PostgreSQL replication issue and investigate database tuning improvements.
+*   **Christopher:** Add the PostgreSQL replication issue to the agenda for the next infrastructure key review.
+*   **Data Metrics Work Stream:** Deliver the new metric for "percentage of open bugs within SLO" (or exceeding SLO), considering the computational challenges of historical reconstruction.
+*   **Teams/Christopher:** Work on reflecting prioritized security work within security metrics long-term.
+
+4. Decisions Made
+*   **Meeting Structure:** The Engineering Key Review will be broken up into four department-specific key reviews on a two-month rotational schedule.
+*   **Community Contributions Metric:** The "R&D wider MR rate" KPI will be replaced with a new KPI: "percentage of total MRs that come from the community over time."
+*   **Nero MR Rate Target:** The target for the Nero MR rate will be maintained at 10.0 going forward, to balance productivity with improvements in quality, security, and availability.
+*   **Bug SLO Measurement:** The method for measuring bug SLO achievement will be adjusted to focus on the "percentage of open bugs within SLO" (or exceeding SLO) instead of relying solely on closed bugs.
+
+5. Important Highlights
+*   **Rationale for Meeting Split:** Eric Johnson aims to free up his time to "focus on new markets" and shift into "more of a question asker mode."
+*   **Importance of Community Contributions:** The "R&D wider MR rate" exists because "one of the most likely failure modes is that we lose the community."
+*   **Simplifying Metrics:** The CTO emphasized the need for clarity, stating, "If you as our CTO don't even understand them, we went overboard," in reference to complex metric taxonomies.
+*   **Critique of Misleading Metrics:** A key insight was that measuring SLO achievement based only on *closed bugs* could allow for "100% SLO achievement" even if "99% of all bugs are overdue," highlighting the need for a focus on *open bugs*.
+*   **Strategic KPI Shift:** The company is moving towards holding productivity (MR rate) steady at 10.0 and "start[ing] to raise other things related to quality, security, availability" as a business priority.

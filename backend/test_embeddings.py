@@ -1,0 +1,3 @@
+from services.embedding_service import create_meeting_embeddings
+
+create_meeting_embeddings(9,2)
