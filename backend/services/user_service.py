@@ -1,7 +1,18 @@
 import bcrypt
-from database.db import get_db_connection, execute_query, commit_changes, close_connection
-#hash password
-def hash_password(password):
+
+from database.db import (
+    get_db_connection,
+    execute_query,
+    commit_changes,
+    close_connection
+)
+
+
+# =====================================================
+# PASSWORD HASHING
+# =====================================================
+
+def hash_password(password: str) -> str:
 
     salt = bcrypt.gensalt()
 
@@ -12,81 +23,149 @@ def hash_password(password):
 
     return hashed.decode("utf-8")
 
-def verify_password(password, password_hash):
+
+def verify_password(
+    password: str,
+    password_hash: str
+) -> bool:
 
     return bcrypt.checkpw(
         password.encode("utf-8"),
         password_hash.encode("utf-8")
     )
-#find user by email
-def find_user_by_email(email):
+
+
+# =====================================================
+# FIND USER BY EMAIL
+# =====================================================
+
+def find_user_by_email(email: str):
 
     connection = get_db_connection()
 
-    query = """
-    SELECT *
-    FROM users
-    WHERE email = %s
-    """
+    if connection is None:
+        return None
 
-    cursor = execute_query(
-        connection,
-        query,
-        (email,)
-    )
+    cursor = None
 
-    user = cursor.fetchone()
+    try:
 
-    close_connection(connection)
+        query = """
+        SELECT *
+        FROM users
+        WHERE email = %s
+        """
 
-    return user
-#find by id
-def find_user_by_id(user_id):
+        cursor = execute_query(
+            connection,
+            query,
+            (email,)
+        )
 
-    connection = get_db_connection()
+        if cursor is None:
+            return None
 
-    query = """
-    SELECT *
-    FROM users
-    WHERE id = %s
-    """
+        return cursor.fetchone()
 
-    cursor = execute_query(
-        connection,
-        query,
-        (user_id,)
-    )
+    finally:
 
-    user = cursor.fetchone()
+        if cursor:
+            cursor.close()
 
-    close_connection(connection)
+        close_connection(connection)
 
-    return user
-#check duplicate email
-def is_email_duplicate(email):
+
+# =====================================================
+# FIND USER BY ID
+# =====================================================
+
+def find_user_by_id(user_id: int):
 
     connection = get_db_connection()
 
-    query = """
-    SELECT COUNT(*) AS count
-    FROM users
-    WHERE email = %s
-    """
+    if connection is None:
+        return None
 
-    cursor = execute_query(
-        connection,
-        query,
-        (email,)
-    )
+    cursor = None
 
-    result = cursor.fetchone()
+    try:
 
-    close_connection(connection)
+        query = """
+        SELECT *
+        FROM users
+        WHERE id = %s
+        """
 
-    return result["count"] > 0
-#register user
+        cursor = execute_query(
+            connection,
+            query,
+            (user_id,)
+        )
 
-def register_user(name, email, password):
+        if cursor is None:
+            return None
+
+        return cursor.fetchone()
+
+    finally:
+
+        if cursor:
+            cursor.close()
+
+        close_connection(connection)
+
+
+# =====================================================
+# CHECK DUPLICATE EMAIL
+# =====================================================
+
+def is_email_duplicate(email: str) -> bool:
+
+    connection = get_db_connection()
+
+    if connection is None:
+        return False
+
+    cursor = None
+
+    try:
+
+        query = """
+        SELECT COUNT(*) AS count
+        FROM users
+        WHERE email = %s
+        """
+
+        cursor = execute_query(
+            connection,
+            query,
+            (email,)
+        )
+
+        if cursor is None:
+            return False
+
+        result = cursor.fetchone()
+
+        return result["count"] > 0
+
+    finally:
+
+        if cursor:
+            cursor.close()
+
+        close_connection(connection)
+
+
+# =====================================================
+# REGISTER USER
+# =====================================================
+
+def register_user(
+    name: str,
+    email: str,
+    password: str
+):
 
     if is_email_duplicate(email):
 
@@ -95,12 +174,7 @@ def register_user(name, email, password):
             "message": "Email already exists"
         }
 
-
-    password_hash = hash_password(password)
-
-
     connection = get_db_connection()
-
 
     if connection is None:
 
@@ -109,40 +183,59 @@ def register_user(name, email, password):
             "message": "Database connection failed"
         }
 
+    cursor = None
 
-    query = """
-    INSERT INTO users
-    (
-        username,
-        email,
-        password_hash
-    )
-    VALUES
-    (
-        %s,
-        %s,
-        %s
-    )
-    """
+    try:
 
+        password_hash = hash_password(password)
 
-    execute_query(
-        connection,
-        query,
+        query = """
+        INSERT INTO users
         (
-            name,
+            username,
             email,
             password_hash
         )
-    )
+        VALUES
+        (
+            %s,
+            %s,
+            %s
+        )
+        """
 
+        cursor = execute_query(
+            connection,
+            query,
+            (
+                name,
+                email,
+                password_hash
+            )
+        )
 
-    commit_changes(connection)
+        if cursor is None:
+            raise Exception("Failed to execute query")
 
-    close_connection(connection)
+        commit_changes(connection)
 
+        return {
+            "success": True,
+            "message": "User registered successfully"
+        }
 
-    return {
-        "success": True,
-        "message": "User registered successfully"
-    }
+    except Exception as e:
+
+        connection.rollback()
+
+        return {
+            "success": False,
+            "message": str(e)
+        }
+
+    finally:
+
+        if cursor:
+            cursor.close()
+
+        close_connection(connection)

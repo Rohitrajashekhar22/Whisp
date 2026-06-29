@@ -1,2 +1,4 @@
 .venv/
 backend/processed/
+.env
+backend/.env

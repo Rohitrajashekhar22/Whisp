@@ -1,39 +1,31 @@
-import sounddevice as sd
-from scipy.io.wavfile import write
+from faster_whisper import WhisperModel
+import tempfile
 import os
-import uuid
 
 
-def record_audio_chunk(user_id, meeting_id):
+class LiveAudioService:
 
-    temp_dir = f"temp/user_{user_id}/meeting_{meeting_id}"
-    os.makedirs(
-        temp_dir,
-        exist_ok=True
-    )
-    filename = f"{temp_dir}/{uuid.uuid4()}.wav"
+    def __init__(self):
+        self.model = WhisperModel(
+            "base",
+            device="cpu",
+            compute_type="int8"
+        )
 
-    sample_rate = 16000
+    def process(self, audio_bytes):
 
-    duration = 5
+        temp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+        temp.write(audio_bytes)
+        temp.close()
 
-    print("Recording...")
+        try:
+            segments, _ = self.model.transcribe(temp.name)
 
-    audio = sd.rec(
-        int(duration * sample_rate),
-        samplerate=sample_rate,
-        channels=1,
-        dtype="int16"
-    )
+            text = " ".join([seg.text for seg in segments])
 
-    sd.wait()
+            return {
+                "text": text
+            }
 
-    write(
-        filename,
-        sample_rate,
-        audio
-    )
-
-    print("Recording Finished")
-
-    return filename
+        finally:
+            os.remove(temp.name)

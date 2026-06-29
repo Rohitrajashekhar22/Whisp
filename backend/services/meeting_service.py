@@ -319,7 +319,10 @@ def append_transcript(meeting_id, text):
         )
         WHERE id = %s
         """,
-        ("\n" + text, meeting_id)
+       (
+    f"{text}\n",
+    meeting_id
+)
     )
 
     connection.commit()
@@ -348,9 +351,9 @@ def end_live_meeting(meeting_id):
     connection.close()
 
 
-def get_live_meeting(meeting_id):
-    connection = get_db_connection()
+def get_live_meeting(meeting_id, user_id):
 
+    connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
     cursor.execute(
@@ -358,8 +361,12 @@ def get_live_meeting(meeting_id):
         SELECT *
         FROM live_meetings
         WHERE id = %s
+        AND user_id = %s
         """,
-        (meeting_id,)
+        (
+            meeting_id,
+            user_id
+        )
     )
 
     meeting = cursor.fetchone()

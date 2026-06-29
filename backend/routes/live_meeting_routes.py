@@ -1,149 +1,209 @@
-from fastapi import APIRouter, Form
+from fastapi import APIRouter, Depends, Form, HTTPException
 import threading
 
-from services.embedding_service import create_meeting_embeddings
-from services.meeting_service import (
-    create_live_meeting,
-    get_live_meeting,
-    end_live_meeting
-)
+from security import get_current_user
 
+from services.live_meeting_service import LiveMeetingService
 from services.live_stream_service import (
     start_live_stream,
-    stop_meeting
+    stop_meeting,
+    is_meeting_running
+)
+from services.live_summary_service import generate_meeting_summary
+from services.embedding_service import create_meeting_embeddings
+
+router = APIRouter(
+    tags=["Live Meeting"]
 )
 
-from services.live_summary_service import (
-    generate_meeting_summary
-)
+service = LiveMeetingService()
 
-router = APIRouter()
 
-# -------------------------
-# START LIVE MEETING
-# -------------------------
-@router.post("/start-meeting")
-def start_meeting(
-    user_id: int = Form(...),
-    title: str = Form(...)
+# =====================================================
+# VERIFY OWNER
+# =====================================================
+
+def verify_meeting_owner(
+    meeting_id: int,
+    current_user
 ):
 
-    meeting_id = create_live_meeting(
-        user_id,
-        title
+    meeting = service.get_live_meeting(
+        meeting_id,
+        current_user["id"]
     )
 
-    thread = threading.Thread(
-        target=start_live_stream,
-        args=(meeting_id, user_id),
-        daemon=True
-    )
-
-    thread.start()
-
-    return {
-        "message": "Live meeting started",
-        "meeting_id": meeting_id
-    }
-
-
-# -------------------------
-# STOP LIVE MEETING
-# -------------------------
-@router.post("/stop-meeting")
-def stop_live_meeting():
-
-    stop_meeting()
-
-    return {
-        "message": "Meeting stopped"
-    }
-
-
-# -------------------------
-# GET LIVE MEETING
-# -------------------------
-@router.get("/live-meeting/{meeting_id}")
-def get_meeting_data(meeting_id: int):
-
-    meeting = get_live_meeting(
-        meeting_id
-    )
+    if meeting is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Meeting not found"
+        )
 
     return meeting
 
 
-# -------------------------
-# GET TRANSCRIPT
-# -------------------------
-@router.get("/live-meeting/{meeting_id}/transcript")
-def get_transcript(meeting_id: int):
+# =====================================================
+# START MEETING
+# =====================================================
 
-    meeting = get_live_meeting(
-        meeting_id
+@router.post("/start")
+def start_meeting(
+    title: str = Form(...),
+    current_user=Depends(get_current_user)
+):
+
+    meeting_id = service.create_live_meeting(
+        current_user["id"],
+        title
     )
 
+    threading.Thread(
+        target=start_live_stream,
+        args=(meeting_id, current_user["id"]),
+        daemon=True
+    ).start()
+
     return {
-        "meeting_id": meeting_id,
-        "transcript": meeting["transcript"]
+        "message": "Meeting started",
+        "meeting_id": meeting_id
     }
 
 
-# -------------------------
-# GENERATE SUMMARY
-# -------------------------
-@router.post("/live-meeting/{meeting_id}/summary")
-def create_summary(meeting_id: int):
+# =====================================================
+# STOP RECORDING
+# =====================================================
 
-    summary = generate_meeting_summary(
-        meeting_id
+@router.post("/{meeting_id}/stop")
+def stop_recording(
+    meeting_id: int,
+    current_user=Depends(get_current_user)
+):
+
+    verify_meeting_owner(
+        meeting_id,
+        current_user
     )
 
+    if not stop_meeting(meeting_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Meeting already stopped"
+        )
+
     return {
-        "meeting_id": meeting_id,
+        "message": "Recording stopped"
+    }
+
+
+# =====================================================
+# END MEETING
+# =====================================================
+
+@router.post("/{meeting_id}/end")
+def end_meeting(
+    meeting_id: int,
+    current_user=Depends(get_current_user)
+):
+
+    verify_meeting_owner(
+        meeting_id,
+        current_user
+    )
+
+    stop_meeting(meeting_id)
+
+    summary = generate_meeting_summary(
+        meeting_id,
+        current_user["id"]
+    )
+
+    try:
+        create_meeting_embeddings(
+            meeting_id,
+            current_user["id"]
+        )
+    except Exception as e:
+        print(e)
+
+    service.end_live_meeting(meeting_id)
+
+    return {
+        "message": "Meeting ended",
         "summary": summary
     }
 
 
-# -------------------------
-# GET SUMMARY
-# -------------------------
-@router.get("/live-meeting/{meeting_id}/summary")
-def get_summary(meeting_id: int):
+# =====================================================
+# GET MEETING
+# =====================================================
 
-    meeting = get_live_meeting(
-        meeting_id
+@router.get("/{meeting_id}")
+def get_meeting(
+    meeting_id: int,
+    current_user=Depends(get_current_user)
+):
+
+    return verify_meeting_owner(
+        meeting_id,
+        current_user
+    )
+
+
+# =====================================================
+# GET TRANSCRIPT
+# =====================================================
+
+@router.get("/{meeting_id}/transcript")
+def get_transcript(
+    meeting_id: int,
+    current_user=Depends(get_current_user)
+):
+
+    meeting = verify_meeting_owner(
+        meeting_id,
+        current_user
     )
 
     return {
-        "meeting_id": meeting_id,
+        "transcript": meeting["transcript"]
+    }
+
+
+# =====================================================
+# GET SUMMARY
+# =====================================================
+
+@router.get("/{meeting_id}/summary")
+def get_summary(
+    meeting_id: int,
+    current_user=Depends(get_current_user)
+):
+
+    meeting = verify_meeting_owner(
+        meeting_id,
+        current_user
+    )
+
+    return {
         "summary": meeting["summary"]
     }
 
 
-# -------------------------
-# END LIVE MEETING
-# -------------------------
-@router.post("/live-meeting/{meeting_id}/end")
-def end_meeting(meeting_id:int):
+# =====================================================
+# STATUS
+# =====================================================
 
+@router.get("/{meeting_id}/status")
+def meeting_status(
+    meeting_id: int,
+    current_user=Depends(get_current_user)
+):
 
-
-
-
-
-    # generate and store meeting summary
-    generate_meeting_summary(meeting_id)
-
-    # create embeddings here
-    create_meeting_embeddings(
-        meeting_id
+    verify_meeting_owner(
+        meeting_id,
+        current_user
     )
 
-
-    end_live_meeting(meeting_id)
-
-
     return {
-        "message":"Meeting ended"
+        "running": is_meeting_running(meeting_id)
     }

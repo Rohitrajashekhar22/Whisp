@@ -4,11 +4,13 @@ from services.transcription_service import (
 
 
 def transcribe_chunk(
-    audio_path
+    audio_path: str,
+    user_id: int,
+    meeting_id: int
 ):
 
-    transcript = transcribe_audio(
-        audio_path
+    return transcribe_audio(
+        audio_path=audio_path,
+        user_id=user_id,
+        meeting_id=meeting_id
     )
-
-    return transcript

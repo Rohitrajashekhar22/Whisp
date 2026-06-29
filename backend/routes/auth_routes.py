@@ -1,192 +1,88 @@
-import os
-import jwt
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, EmailStr
 
-from dotenv import load_dotenv
+from database.db import get_db_connection, execute_query, commit_changes, close_connection
+from security import hash_password, verify_password, create_token
 
-from fastapi import (
-    APIRouter,
-    HTTPException,
-    Depends
-)
-
-from fastapi.security import (
-    HTTPBearer,
-    HTTPAuthorizationCredentials
-)
-
-from services.user_service import (
-    register_user,
-    find_user_by_email,
-    verify_password,
-    find_user_by_id
-)
-
-load_dotenv()
-
-router = APIRouter(
-    prefix="/auth",
-    tags=["Authentication"]
-)
-
-security = HTTPBearer()
-
-JWT_SECRET = os.getenv(
-    "JWT_SECRET"
-)
+router = APIRouter()
 
 
+class UserRegister(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+
+# =========================
 # REGISTER
+# =========================
+
 @router.post("/register")
-def register(
-    name: str,
-    email: str,
-    password: str
-):
+def register(user: UserRegister):
 
-    result = register_user(
-        name,
-        email,
-        password
-    )
-
-    if not result["success"]:
-
-        raise HTTPException(
-            status_code=400,
-            detail=result["message"]
-        )
-
-    return {
-        "message": result["message"]
-    }
-
-@router.post("/login")
-def login(
-    email: str,
-    password: str
-):
-
-    user = find_user_by_email(email)
-
-    if user is None:
-
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid email or password"
-        )
-
-    # verify password
-    if not verify_password(
-        password,
-        user["password_hash"]
-    ):
-
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid email or password"
-        )
-
-    # create jwt token
-    token = jwt.encode(
-
-        {
-            "user_id": user["id"],
-            "email": user["email"]
-        },
-
-        JWT_SECRET,
-
-        algorithm="HS256"
-    )
-
-    return {
-
-        "message":
-        "Login successful",
-
-        "token":
-        token
-    }
-
-
-# DECODE TOKEN
-def decode_token(
-    token: str
-):
+    conn = get_db_connection()
 
     try:
-
-        payload = jwt.decode(
-
-            token,
-
-            JWT_SECRET,
-
-            algorithms=["HS256"]
+        existing = execute_query(
+            conn,
+            "SELECT id FROM users WHERE email=%s",
+            (user.email,),
+            fetchone=True
         )
 
-        return payload
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
 
-    except jwt.InvalidTokenError:
+        hashed = hash_password(user.password)
 
-        raise HTTPException(
-
-            status_code=401,
-
-            detail="Invalid or expired token"
+        execute_query(
+            conn,
+            "INSERT INTO users(username,email,password_hash) VALUES(%s,%s,%s)",
+            (user.username, user.email, hashed)
         )
 
+        commit_changes(conn)
 
-# GET CURRENT USER
-def get_current_user(
+        return {"message": "User created"}
 
-    credentials:
-    HTTPAuthorizationCredentials = Depends(security)
+    finally:
+        close_connection(conn)
 
-):
 
-    token = credentials.credentials
+# =========================
+# LOGIN
+# =========================
 
-    payload = decode_token(token)
+@router.post("/login")
+def login(user: UserLogin):
 
-    user = find_user_by_id(
-        payload["user_id"]
-    )
+    conn = get_db_connection()
 
-    if user is None:
-
-        raise HTTPException(
-            status_code=404,
-            detail="User not found"
+    try:
+        db_user = execute_query(
+            conn,
+            "SELECT * FROM users WHERE email=%s",
+            (user.email,),
+            fetchone=True
         )
 
-    return user
+        if not db_user:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
 
+        if not verify_password(user.password, db_user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
 
-# AUTH ME
-@router.get("/me")
-def auth_me(
+        token = create_token({"user_id": db_user["id"]})
 
-    current_user = Depends(
-        get_current_user
-    )
-
-):
-
-    return {
-
-        "message":
-        "User authenticated",
-
-        "user": {
-
-            "id":
-            current_user["id"],
-
-            "username":
-            current_user["username"],
-
-            "email":
-            current_user["email"]
+        return {
+            "access_token": token,
+            "token_type": "bearer"
         }
-    }
+
+    finally:
+        close_connection(conn)

@@ -27,7 +27,7 @@ def init_db():
 
             if query:
 
-                cursor.execute(query)
+                cursor.execute(query, multi=True)
 
         connection.commit()
 

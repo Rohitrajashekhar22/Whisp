@@ -1,32 +1,50 @@
 import os
 from dotenv import load_dotenv
+from google import genai
 
-from services.meeting_service import (
-    get_live_meeting,
-    save_live_summary
-)
+from services.live_meeting_service import LiveMeetingService
 
 load_dotenv()
-from google import genai
 
 client = genai.Client()
 
+live_service = LiveMeetingService()
 
-def generate_meeting_summary(meeting_id):
 
-    meeting = get_live_meeting(meeting_id)
+# =====================================================
+# GENERATE LIVE MEETING SUMMARY
+# =====================================================
 
-    transcript = meeting["transcript"]
+def generate_meeting_summary(meeting_id: int, user_id: int):
+
+    meeting = live_service.get_live_meeting(
+        meeting_id,
+        user_id
+    )
+
+    if meeting is None:
+        raise Exception("Meeting not found")
+
+    transcript = meeting.get("transcript", "")
+
+    if not transcript.strip():
+        raise Exception("Transcript is empty")
 
     prompt = f"""
 You are an AI meeting assistant.
 
 Analyze the following meeting transcript.
 
-Return a clean meeting summary.
+Return:
+
+1. Summary
+2. Key Points
+3. Action Items
+4. Decisions
+
+Keep everything concise.
 
 Transcript:
-
 {transcript}
 """
 
@@ -37,7 +55,7 @@ Transcript:
 
     summary = response.text
 
-    save_live_summary(
+    live_service.save_live_summary(
         meeting_id,
         summary
     )

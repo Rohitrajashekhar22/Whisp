@@ -1,64 +1,127 @@
-from youtube_transcript_api import YouTubeTranscriptApi
+import logging
 from urllib.parse import urlparse, parse_qs
 
+from youtube_transcript_api import (
+    YouTubeTranscriptApi
+)
+from youtube_transcript_api._errors import (
+    NoTranscriptFound,
+    TranscriptsDisabled,
+    VideoUnavailable
+)
 
-def extract_video_id(url):
+logger = logging.getLogger(__name__)
+
+
+def extract_video_id(url: str):
 
     try:
 
-        parsed_url = urlparse(url)
+        parsed = urlparse(url)
 
-        if parsed_url.hostname and "youtube.com" in parsed_url.hostname:
+        if parsed.hostname and "youtube.com" in parsed.hostname:
+
             return parse_qs(
-                parsed_url.query
-            ).get("v", [None])[0]
+                parsed.query
+            ).get(
+                "v",
+                [None]
+            )[0]
 
-        elif parsed_url.hostname and "youtu.be" in parsed_url.hostname:
-            return parsed_url.path[1:]
+        if parsed.hostname and "youtu.be" in parsed.hostname:
+
+            return parsed.path.lstrip("/")
 
         return None
 
     except Exception:
+
         return None
 
 
-def is_valid_youtube_url(url):
+def is_valid_youtube_url(url: str):
+
     return extract_video_id(url) is not None
 
 
-def get_youtube_transcript(url):
+def get_youtube_transcript(url: str):
 
     video_id = extract_video_id(url)
 
-    print("VIDEO ID:", video_id)
+    if video_id is None:
 
-    if not video_id:
         return {
+
             "success": False,
+
             "error": "Invalid YouTube URL"
+
         }
 
     try:
 
         api = YouTubeTranscriptApi()
 
-        transcript_data = api.fetch(video_id)
+        transcript = api.fetch(video_id)
 
-        transcript_text = " ".join(
+        text = " ".join(
+
             chunk.text
-            for chunk in transcript_data
+
+            for chunk in transcript
+
+        )
+
+        logger.info(
+            f"Transcript fetched for {video_id}"
         )
 
         return {
+
             "success": True,
-            "transcript": transcript_text
+
+            "transcript": text
+
+        }
+
+    except TranscriptsDisabled:
+
+        return {
+
+            "success": False,
+
+            "error": "Transcripts are disabled for this video."
+
+        }
+
+    except NoTranscriptFound:
+
+        return {
+
+            "success": False,
+
+            "error": "No transcript available for this video."
+
+        }
+
+    except VideoUnavailable:
+
+        return {
+
+            "success": False,
+
+            "error": "Video unavailable."
+
         }
 
     except Exception as e:
 
-        print("TRANSCRIPT ERROR:", str(e))
+        logger.exception(e)
 
         return {
+
             "success": False,
+
             "error": str(e)
+
         }
