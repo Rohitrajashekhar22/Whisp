@@ -112,15 +112,21 @@ Go to the backend folder:
 cd backend
 Create a virtual environment:
 python -m venv .venv
+
 Activate it on Linux/macOS:
 source .venv/bin/activate
+
 Install the dependencies:
 pip install -r requirements.txt
+
 Run the FastAPI server:
 uvicorn main:app --reload
+
 Then open:
 http://localhost:8000/docs
+
 You can test the backend directly from Swagger UI.
+
 Depending on the current project configuration, environment variables and external services may also need to be configured before all endpoints can be used.
 
 RAG in Whisp
